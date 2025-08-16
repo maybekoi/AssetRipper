@@ -1,5 +1,6 @@
 using AssetRipper.Assets;
 using AssetRipper.Assets.Collections;
+using AssetRipper.Assets.Metadata;
 using AssetRipper.Export.UnityProjects.Project;
 using AssetRipper.Import.Configuration;
 using AssetRipper.Processing.Scenes;
@@ -28,6 +29,7 @@ public class ProjectAssetContainer : IExportContainer
 			{
 				CheckIfAlreadyAdded(this, asset, collection);
 				m_assetCollections.Add(asset, collection);
+				m_assetInfoCollections.Add(asset.AssetInfo, collection);
 			}
 			if (collection is SceneExportCollection scene)
 			{
@@ -43,6 +45,11 @@ public class ProjectAssetContainer : IExportContainer
 			{
 				throw new ArgumentException($"Asset {asset} is already added by {previousCollection}");
 			}
+			
+			if (container.m_assetInfoCollections.TryGetValue(asset.AssetInfo, out IExportCollection? logicalPreviousCollection))
+			{
+				throw new ArgumentException($"Asset with AssetInfo {asset.AssetInfo} (Collection: {asset.AssetInfo.Collection.Name}, PathID: {asset.AssetInfo.PathID}) is already added by {logicalPreviousCollection}");
+			}
 		}
 	}
 
@@ -54,6 +61,11 @@ public class ProjectAssetContainer : IExportContainer
 		}
 
 		return ExportIdHandler.GetMainExportID(asset);
+	}
+
+	public IExportCollection? GetCollectionByAssetInfo(AssetInfo assetInfo)
+	{
+		return m_assetInfoCollections.TryGetValue(assetInfo, out IExportCollection? collection) ? collection : null;
 	}
 
 	public AssetType ToExportType(Type type)
@@ -91,6 +103,7 @@ public class ProjectAssetContainer : IExportContainer
 
 	private readonly ProjectExporter m_exporter;
 	private readonly Dictionary<IUnityObjectBase, IExportCollection> m_assetCollections = new();
+	private readonly Dictionary<AssetInfo, IExportCollection> m_assetInfoCollections = new();
 
 	private readonly IBuildSettings? m_buildSettings;
 	private readonly SceneExportCollection[] m_scenes;

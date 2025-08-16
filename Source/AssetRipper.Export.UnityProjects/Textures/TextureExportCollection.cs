@@ -24,13 +24,53 @@ public class TextureExportCollection : AssetsExportCollection<ITexture2D>
 
 		if (exportSprites && spriteInformationObject.Sprites.Count > 0)
 		{
+			System.Diagnostics.Debug.WriteLine(
+				$"Processing {spriteInformationObject.Sprites.Count} sprites for texture '{Asset.GetBestName()}' (Type: {Asset.GetType().Name}, ClassID: {Asset.ClassID}, PathID: {Asset.PathID})");
+			
 			foreach ((ISprite? sprite, ISpriteAtlas? _) in spriteInformationObject.Sprites)
 			{
-				Debug.Assert(sprite.TryGetTexture() == Asset);
-				AddAsset(sprite);
+				ITexture2D? spriteTexture = sprite.TryGetTexture();
+				if (spriteTexture != Asset)
+				{
+					System.Diagnostics.Debug.WriteLine(
+						$"Warning: Sprite '{sprite.GetBestName()}' (Type: {sprite.GetType().Name}, ClassID: {sprite.ClassID}, PathID: {sprite.PathID}) " +
+						$"references texture '{spriteTexture?.GetBestName() ?? "null"}' (Type: {spriteTexture?.GetType().Name ?? "null"}, ClassID: {spriteTexture?.ClassID ?? -1}, PathID: {spriteTexture?.PathID ?? -1}) " +
+						$"but SpriteInformationObject was created for texture '{Asset.GetBestName()}' (Type: {Asset.GetType().Name}, ClassID: {Asset.ClassID}, PathID: {Asset.PathID}). " +
+						$"This may indicate a processing issue. Continuing with export...");
+				}
+				
+				if (sprite.AssetInfo == Asset.AssetInfo)
+				{
+					System.Diagnostics.Debug.WriteLine(
+						$"Warning: Skipping sprite '{sprite.GetBestName()}' (Type: {sprite.GetType().Name}, ClassID: {sprite.ClassID}, PathID: {sprite.PathID}) " +
+						$"because it has the same AssetInfo as the main texture '{Asset.GetBestName()}' (Type: {Asset.GetType().Name}, ClassID: {Asset.ClassID}, PathID: {Asset.PathID}). " +
+						$"This would create a duplicate asset reference.");
+					continue;
+				}
+				
+				if (spriteTexture is not null && spriteTexture.AssetInfo == Asset.AssetInfo)
+				{
+					System.Diagnostics.Debug.WriteLine(
+						$"Warning: Skipping sprite '{sprite.GetBestName()}' (Type: {sprite.GetType().Name}, ClassID: {sprite.ClassID}, PathID: {sprite.PathID}) " +
+						$"because it references a texture with the same AssetInfo as the main texture.");
+					continue;
+				}
+				
+				if (!ContainsByAssetInfo(sprite))
+				{
+					System.Diagnostics.Debug.WriteLine(
+						$"Adding sprite to collection: '{sprite.GetBestName()}' (Type: {sprite.GetType().Name}, ClassID: {sprite.ClassID}, PathID: {sprite.PathID}) " +
+						$"for texture '{Asset.GetBestName()}' (Type: {Asset.GetType().Name}, ClassID: {Asset.ClassID}, PathID: {Asset.PathID})");
+					AddAsset(sprite);
+				}
+				else
+				{
+					System.Diagnostics.Debug.WriteLine(
+						$"Sprite already in collection: '{sprite.GetBestName()}' (Type: {sprite.GetType().Name}, ClassID: {sprite.ClassID}, PathID: {sprite.PathID}) " +
+						$"for texture '{Asset.GetBestName()}' (Type: {Asset.GetType().Name}, ClassID: {Asset.ClassID}, PathID: {Asset.PathID})");
+				}
 			}
 		}
-		AddAsset(spriteInformationObject);
 	}
 
 	protected override IUnityObjectBase CreateImporter(IExportContainer container)
@@ -172,30 +212,83 @@ public class TextureExportCollection : AssetsExportCollection<ITexture2D>
 			{
 				foreach (ISprite sprite in textureSpriteInformation.Keys)
 				{
-#warning TODO: TEMP:
-					long exportID = GetExportID(container, sprite);
-					ISpriteMetaData smeta = importer.SpriteSheet.GetSpriteMetaData(sprite.Name);
-					smeta.InternalID = exportID;
-					AssetPair<AssetPair<int, long>, Utf8String> pair = importer.InternalIDToNameTable.AddNew();
-					pair.Key.Key = (int)ClassIDType.Sprite;
-					pair.Key.Value = exportID;
-					pair.Value = sprite.Name;
+					try
+					{
+						long exportID = GetExportID(container, sprite);
+						
+						ISpriteMetaData? smeta = null;
+						try
+						{
+							smeta = importer.SpriteSheet.GetSpriteMetaData(sprite.Name);
+						}
+						catch (KeyNotFoundException)
+						{
+							foreach (ISpriteMetaData metaData in importer.SpriteSheet.Sprites)
+							{
+								if (metaData.Name == sprite.Name)
+								{
+									smeta = metaData;
+									break;
+								}
+							}
+						}
+						
+						if (smeta is not null)
+						{
+							smeta.InternalID = exportID;
+							AssetPair<AssetPair<int, long>, Utf8String> pair = importer.InternalIDToNameTable.AddNew();
+							pair.Key.Key = (int)ClassIDType.Sprite;
+							pair.Key.Value = exportID;
+							pair.Value = sprite.Name;
+						}
+						else
+						{
+							System.Diagnostics.Debug.WriteLine(
+								$"Warning: Could not find sprite meta data for sprite '{sprite.Name}' (Type: {sprite.GetType().Name}, ClassID: {sprite.ClassID}, PathID: {sprite.PathID}) " +
+								$"in texture '{Asset.GetBestName()}' (Type: {Asset.GetType().Name}, ClassID: {Asset.ClassID}, PathID: {Asset.PathID}). " +
+								$"Skipping InternalIDToNameTable entry for this sprite.");
+						}
+					}
+					catch (Exception ex)
+					{
+						System.Diagnostics.Debug.WriteLine(
+							$"Warning: Error processing sprite '{sprite.Name}' (Type: {sprite.GetType().Name}, ClassID: {sprite.ClassID}, PathID: {sprite.PathID}) " +
+							$"for texture '{Asset.GetBestName()}' (Type: {Asset.GetType().Name}, ClassID: {Asset.ClassID}, PathID: {Asset.PathID}): {ex.Message}");
+					}
 				}
 			}
 			else if (importer.Has_FileIDToRecycleName_AssetDictionary_Int64_Utf8String())
 			{
 				foreach (ISprite sprite in textureSpriteInformation.Keys)
 				{
-					long exportID = GetExportID(container, sprite);
-					importer.FileIDToRecycleName_AssetDictionary_Int64_Utf8String.Add(exportID, sprite.Name);
+					try
+					{
+						long exportID = GetExportID(container, sprite);
+						importer.FileIDToRecycleName_AssetDictionary_Int64_Utf8String.Add(exportID, sprite.Name);
+					}
+					catch (Exception ex)
+					{
+						System.Diagnostics.Debug.WriteLine(
+							$"Warning: Error processing sprite '{sprite.Name}' (Type: {sprite.GetType().Name}, ClassID: {sprite.ClassID}, PathID: {sprite.PathID}) " +
+							$"for texture '{Asset.GetBestName()}' (Type: {Asset.GetType().Name}, ClassID: {Asset.ClassID}, PathID: {Asset.PathID}): {ex.Message}");
+					}
 				}
 			}
 			else if (importer.Has_FileIDToRecycleName_AssetDictionary_Int32_Utf8String())
 			{
 				foreach (ISprite sprite in textureSpriteInformation.Keys)
 				{
-					long exportID = GetExportID(container, sprite);
-					importer.FileIDToRecycleName_AssetDictionary_Int32_Utf8String.Add((int)exportID, sprite.Name);
+					try
+					{
+						long exportID = GetExportID(container, sprite);
+						importer.FileIDToRecycleName_AssetDictionary_Int32_Utf8String.Add((int)exportID, sprite.Name);
+					}
+					catch (Exception ex)
+					{
+						System.Diagnostics.Debug.WriteLine(
+							$"Warning: Error processing sprite '{sprite.Name}' (Type: {sprite.GetType().Name}, ClassID: {sprite.ClassID}, PathID: {sprite.PathID}) " +
+							$"for texture '{Asset.GetBestName()}' (Type: {Asset.GetType().Name}, ClassID: {Asset.ClassID}, PathID: {Asset.PathID}): {ex.Message}");
+					}
 				}
 			}
 		}
@@ -208,4 +301,31 @@ public class TextureExportCollection : AssetsExportCollection<ITexture2D>
 	private readonly bool m_exportSprites;
 	private readonly bool m_convert = true;
 	private uint m_nextExportID = 0;
+	
+	/// <summary>
+	/// Check if an asset is already in the collection by comparing AssetInfo rather than object references.
+	/// This prevents duplicate assets that have the same logical identity but different object references.
+	/// </summary>
+	private bool ContainsByAssetInfo(IUnityObjectBase asset)
+	{
+		if (Asset.AssetInfo == asset.AssetInfo)
+		{
+			return true;
+		}
+		
+		if (Contains(asset))
+		{
+			return true;
+		}
+		
+		foreach (IUnityObjectBase existingAsset in Assets)
+		{
+			if (existingAsset.AssetInfo == asset.AssetInfo)
+			{
+				return true;
+			}
+		}
+		
+		return false;
+	}
 }

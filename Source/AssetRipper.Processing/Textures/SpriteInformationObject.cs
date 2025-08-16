@@ -12,7 +12,14 @@ public sealed class SpriteInformationObject : AssetGroup, INamed
 {
 	public SpriteInformationObject(AssetInfo assetInfo, ITexture2D texture) : base(assetInfo)
 	{
-		Texture = texture;
+		Texture = texture ?? throw new ArgumentNullException(nameof(texture));
+		
+		if (texture.Collection is null)
+		{
+			System.Diagnostics.Debug.WriteLine(
+				$"Warning: SpriteInformationObject created for texture '{(texture as IUnityObjectBase)?.GetBestName() ?? texture.GetType().Name}' (Type: {texture.GetType().Name}, ClassID: {texture.ClassID}, PathID: {texture.PathID}) " +
+				$"but texture has no collection assigned. This may cause export issues.");
+		}
 	}
 
 	public ITexture2D Texture { get; }
@@ -86,7 +93,18 @@ public sealed class SpriteInformationObject : AssetGroup, INamed
 
 	public override void SetMainAsset()
 	{
-		Debug.Assert(Texture.MainAsset is null);
+		if (Texture.MainAsset is not null && Texture.MainAsset != this)
+		{
+			System.Diagnostics.Debug.WriteLine(
+				$"Warning: Texture '{(Texture as IUnityObjectBase)?.GetBestName() ?? Texture.GetType().Name}' (Type: {Texture.GetType().Name}, ClassID: {Texture.ClassID}, PathID: {Texture.PathID}) " +
+				$"in collection '{Texture.Collection.Name}' (Bundle: {Texture.Collection.Bundle.Name}) " +
+				$"already has a main asset assigned: '{(Texture.MainAsset as IUnityObjectBase)?.GetBestName() ?? Texture.MainAsset.GetType().Name}' (Type: {Texture.MainAsset.GetType().Name}, ClassID: {Texture.MainAsset.ClassID}, PathID: {Texture.MainAsset.PathID}) " +
+				$"in collection '{Texture.MainAsset.Collection.Name}' (Bundle: {Texture.MainAsset.Collection.Bundle.Name}). " +
+				$"Skipping main asset assignment for SpriteInformationObject '{(this as IUnityObjectBase)?.GetBestName() ?? this.GetType().Name}' (Type: {this.GetType().Name}, ClassID: {this.ClassID}, PathID: {this.PathID}) " +
+				$"in collection '{this.Collection.Name}' (Bundle: {this.Collection.Bundle.Name}).");
+			return;
+		}
+		
 		base.SetMainAsset();
 	}
 }

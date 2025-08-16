@@ -1,5 +1,9 @@
 ﻿using AssetRipper.Assets;
 using AssetRipper.Assets.Bundles;
+using AssetRipper.Assets.Collections;
+using AssetRipper.Assets.Metadata;
+using AssetRipper.Export.UnityProjects.Configuration;
+using AssetRipper.Export.UnityProjects.Project;
 using AssetRipper.Import.Configuration;
 using AssetRipper.Import.Logging;
 using AssetRipper.SourceGenerated;
@@ -110,18 +114,54 @@ public sealed partial class ProjectExporter
 	private List<IExportCollection> CreateCollections(GameBundle fileCollection)
 	{
 		List<IExportCollection> collections = new();
-		HashSet<IUnityObjectBase> queued = new();
+		HashSet<AssetInfo> queuedAssetInfos = new();
 
 		foreach (IUnityObjectBase asset in fileCollection.FetchAssets())
 		{
-			if (!queued.Contains(asset))
+			if (!queuedAssetInfos.Contains(asset.AssetInfo))
 			{
+				System.Diagnostics.Debug.WriteLine(
+					$"Processing asset: '{asset.GetBestName()}' (Type: {asset.GetType().Name}, ClassID: {asset.ClassID}, PathID: {asset.PathID}) " +
+					$"in collection '{asset.Collection.Name}' (Bundle: {asset.Collection.Bundle.Name})");
+				
 				IExportCollection collection = CreateCollection(asset);
+				
+				bool hasDuplicates = false;
 				foreach (IUnityObjectBase element in collection.Assets)
 				{
-					queued.Add(element);
+					if (queuedAssetInfos.Contains(element.AssetInfo))
+					{
+						hasDuplicates = true;
+						System.Diagnostics.Debug.WriteLine(
+							$"Duplicate detected: Asset '{element.GetBestName()}' (Type: {element.GetType().Name}, ClassID: {element.ClassID}, PathID: {element.PathID}) " +
+							$"is already in another collection");
+						break;
+					}
 				}
-				collections.Add(collection);
+				
+				if (!hasDuplicates)
+				{
+					foreach (IUnityObjectBase element in collection.Assets)
+					{
+						queuedAssetInfos.Add(element.AssetInfo);
+						System.Diagnostics.Debug.WriteLine(
+							$"Added to collection: '{element.GetBestName()}' (Type: {element.GetType().Name}, ClassID: {element.ClassID}, PathID: {element.PathID}) " +
+							$"Collection type: {collection.GetType().Name}");
+					}
+					collections.Add(collection);
+				}
+				else
+				{
+					System.Diagnostics.Debug.WriteLine(
+						$"Warning: Skipping collection for asset '{asset.GetBestName()}' (Type: {asset.GetType().Name}, ClassID: {asset.ClassID}, PathID: {asset.PathID}) " +
+						$"because it contains assets that are already in other collections.");
+				}
+			}
+			else
+			{
+				System.Diagnostics.Debug.WriteLine(
+					$"Skipping already processed asset: '{asset.GetBestName()}' (Type: {asset.GetType().Name}, ClassID: {asset.ClassID}, PathID: {asset.PathID}) " +
+					$"in collection '{asset.Collection.Name}' (Bundle: {asset.Collection.Bundle.Name})");
 			}
 		}
 

@@ -25,10 +25,7 @@ public sealed partial class SpriteProcessor : IAssetProcessor
 		{
 			if (asset is ITexture2D texture)
 			{
-				if (texture.MainAsset is null)
-				{
-					factory.GetOrCreate(texture);
-				}
+				factory.GetOrCreate(texture);
 			}
 			else if (asset is ISprite sprite)
 			{
@@ -54,9 +51,13 @@ public sealed partial class SpriteProcessor : IAssetProcessor
 				}
 			}
 		}
+		
 		foreach (SpriteInformationObject asset in factory.Assets)
 		{
-			asset.SetMainAsset();
+			if (asset.MainAsset is null)
+			{
+				asset.SetMainAsset();
+			}
 		}
 	}
 
