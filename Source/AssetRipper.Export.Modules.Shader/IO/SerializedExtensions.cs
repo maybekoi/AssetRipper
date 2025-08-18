@@ -18,6 +18,7 @@ using AssetRipper.SourceGenerated.Subclasses.SerializedStencilOp;
 using AssetRipper.SourceGenerated.Subclasses.SerializedSubProgram;
 using AssetRipper.SourceGenerated.Subclasses.SerializedSubShader;
 using AssetRipper.SourceGenerated.Subclasses.SerializedTagMap;
+using AssetRipper.Import.Logging;
 
 namespace AssetRipper.Export.Modules.Shaders.IO;
 
@@ -109,7 +110,14 @@ public static class SerializedExtensions
 			IReadOnlyList<ISerializedPlayerSubProgram> subPrograms = _this.GetPlayerSubPrograms();
 			for (int i = 0; i < subPrograms.Count; i++)
 			{
-				subPrograms[i].Export(_this.GetParameterBlobIndices()[i], writer, type);
+				try
+				{
+					subPrograms[i].Export(_this.GetParameterBlobIndices()[i], writer, type);
+				}
+				catch (Exception ex)
+				{
+					Logger.Error(ex.Message, ex);
+				}
 			}
 		}
 		else
@@ -117,7 +125,14 @@ public static class SerializedExtensions
 			int tierCount = _this.GetTierCount();
 			for (int i = 0; i < _this.SubPrograms.Count; i++)
 			{
-				_this.SubPrograms[i].Export(writer, type, tierCount > 1);
+				try
+				{
+					_this.SubPrograms[i].Export(writer, type, tierCount > 1);
+				}
+				catch (Exception ex)
+				{
+					Logger.Error(ex.Message, ex);
+				}
 			}
 		}
 		writer.WriteIndent(3);

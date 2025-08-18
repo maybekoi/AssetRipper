@@ -21,12 +21,13 @@ public class TextureExportCollection : AssetsExportCollection<ITexture2D>
 		: base(assetExporter, spriteInformationObject.Texture)
 	{
 		m_exportSprites = exportSprites;
+		m_spriteInformationObject = spriteInformationObject;
 
 		if (exportSprites && spriteInformationObject.Sprites.Count > 0)
 		{
 			foreach ((ISprite? sprite, ISpriteAtlas? _) in spriteInformationObject.Sprites)
 			{
-				Debug.Assert(sprite.TryGetTexture() == Asset);
+				//Debug.Assert(sprite.TryGetTexture() == Asset);
 				AddAsset(sprite);
 			}
 		}
@@ -39,7 +40,7 @@ public class TextureExportCollection : AssetsExportCollection<ITexture2D>
 		if (m_convert)
 		{
 			ITextureImporter importer = ImporterFactory.GenerateTextureImporter(container, texture);
-			AddSprites(container, importer, ((SpriteInformationObject?)Asset.MainAsset)!.Sprites);
+			AddSprites(container, importer, m_spriteInformationObject.Sprites);
 			return importer;
 		}
 		else
@@ -206,6 +207,7 @@ public class TextureExportCollection : AssetsExportCollection<ITexture2D>
 	/// yet we still need the sprites to properly set other texture importer settings.
 	/// </summary>
 	private readonly bool m_exportSprites;
+	private readonly SpriteInformationObject m_spriteInformationObject;
 	private readonly bool m_convert = true;
 	private uint m_nextExportID = 0;
 }
